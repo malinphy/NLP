@@ -172,3 +172,12 @@ for i in range(10):
 | 3          | q$_3$       | a$_3$   |
 | 4          | q$_4$       | a$_4$   |
 """    
+
+q_0 = []
+for i in range(len(second_anc_emb)):
+    x = np.array(second_anc_emb[0]).reshape(1,512)
+    y = np.array(second_pos_emb[i]).reshape(1,512)
+    q_0.append(tf.keras.layers.Dot(axes = 1, normalize = True)([x,y]))
+    
+print(tf.math.top_k(tf.squeeze(tf.squeeze(q_0, axis = -1), axis=-1), k =10)[1])
+# second_anc_emb[0]
