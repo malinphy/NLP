@@ -108,11 +108,17 @@ pos_inp = Input(shape =(), dtype = tf.string, name = 'positive_input')
 neg_inp = Input(shape =(), dtype = tf.string, name = 'negative_input')
 
 use_emb = hub.KerasLayer(use_hub, trainable =True)
+
 anc_emb = use_emb(anc_inp)
 pos_emb = use_emb(pos_inp)
 neg_emb = use_emb(neg_inp)
 
+# d1_anc = Dense(256, activation = 'relu')(anc_emb)
+# d1_pos = Dense(256, activation = 'relu')(pos_emb)
+# d1_neg = Dense(256, activation = 'relu')(neg_emb)
+
 final = tf.keras.layers.Concatenate(axis=-1)([anc_emb, pos_emb, neg_emb])
+final = Dropout(0.2)(final)
 
 triplet_model = Model(inputs = [anc_inp, pos_inp, neg_inp], outputs = final)
 
@@ -127,7 +133,9 @@ triplet_model.fit([np.array(df['title']),
                    ],
                    y_dummy,
                    epochs = 1,
+                  batch_size = 32*8
                   )
+
 
 second_anc_emb = []
 second_pos_emb = []
@@ -149,5 +157,8 @@ second_neg_emb = np.concatenate(np.array(second_neg_emb), axis = 0)
 first = tf.keras.layers.Dot(axes = 1, normalize = True)([first_anc_emb,first_pos_emb])
 second = tf.keras.layers.Dot(axes = 1, normalize = True)([second_anc_emb,second_pos_emb])
 
+first_neg = tf.keras.layers.Dot(axes = 1, normalize = True)([first_anc_emb,first_neg_emb])
+second_neg = tf.keras.layers.Dot(axes = 1, normalize = True)([second_anc_emb,second_neg_emb])
+
 for i in range(10):
-    print(first[i], second[i])
+    print('ANCHOR:',float(first[i]),'--POS:',float(second[i]),'--NEG:',float(second_neg[i]),'--FIRST NEG',float(first_neg[i]))
