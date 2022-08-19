@@ -154,3 +154,21 @@ second_neg = tf.keras.layers.Dot(axes = 1, normalize = True)([second_anc_emb,sec
 
 for i in range(10):
     print('ANCHOR:',float(first[i]),'--POS:',float(second[i]),'--NEG:',float(second_neg[i]),'--FIRST NEG',float(first_neg[i]))
+
+    
+"""# ##### inference 
+# Let's assume that we have a dataset that was pictured like below
+## our main purpose is embedding the question and finding the  closest answer
+## embedding. To do that, I will encode the question and each possible answer.
+## both question embeddings and each answer embeddings will be performed
+## dot product to find the cos angle in between, question and each answers.
+## after that closest answer will have highest cosine similarity.
+
+
+| Index      | Questions   | Answers |
+| :---       |    :----:   |    ---: |
+| 1          | q$_1$       | a$_1$   |
+| 2          | q$_2$       | a$_2$   |
+| 3          | q$_3$       | a$_3$   |
+| 4          | q$_4$       | a$_4$   |
+"""    
