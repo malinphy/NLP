@@ -72,11 +72,15 @@ for i in range(len(df)):
 df['neg_title'] = neg_title
 df['neg_answer'] = neg_answer
 
+
 def distance_calc(y_true, y_pred):
     anchor, positive, negative = tf.split(y_pred, 3, axis=1)
     ap_distance = tf.reduce_sum(tf.square(anchor - positive), -1)
     an_distance = tf.reduce_sum(tf.square(anchor - negative), -1)
-    return (ap_distance, an_distance)
+    loss = ap_distance - an_distance
+    margin = 0
+    loss = tf.maximum(loss + margin, 0.0)
+    return loss
 
 title_batch = tf.data.Dataset.from_tensor_slices(df['title']).batch(32)
 pos_batch = tf.data.Dataset.from_tensor_slices(df['first_answer']).batch(32)
@@ -103,8 +107,7 @@ anc_inp = Input(shape =(), dtype = tf.string, name = 'anchor_input')
 pos_inp = Input(shape =(), dtype = tf.string, name = 'positive_input')
 neg_inp = Input(shape =(), dtype = tf.string, name = 'negative_input')
 
-use_emb = hub.KerasLayer(use_hub)
-
+use_emb = hub.KerasLayer(use_hub, trainable =True)
 anc_emb = use_emb(anc_inp)
 pos_emb = use_emb(pos_inp)
 neg_emb = use_emb(neg_inp)
@@ -143,3 +146,8 @@ second_anc_emb = np.concatenate(np.array(second_anc_emb), axis = 0)
 second_pos_emb = np.concatenate(np.array(second_pos_emb), axis = 0)
 second_neg_emb = np.concatenate(np.array(second_neg_emb), axis = 0)
 
+first = tf.keras.layers.Dot(axes = 1, normalize = True)([first_anc_emb,first_pos_emb])
+second = tf.keras.layers.Dot(axes = 1, normalize = True)([second_anc_emb,second_pos_emb])
+
+for i in range(10):
+    print(first[i], second[i])
