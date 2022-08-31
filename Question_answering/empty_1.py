@@ -30,7 +30,7 @@ bert_layer = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H
 vocab_file = bert_layer.resolved_object.vocab_file.asset_path.numpy().decode("utf-8")
 tokenizer = BertWordPieceTokenizer(vocab=vocab_file, lowercase=True)
 
-tokenizer.encode('hi','there')
+# tokenizer.encode('hi','there')
 
 from google.colab import files 
 from google.colab import drive
@@ -48,10 +48,10 @@ print(len(train_data))
 input_len = 384
 
 test_data = train_data.loc[87500:87598].reset_index()
-train_data = train_data.loc[0:10000]
+train_data = train_data.loc[0:20000]
 train_data = train_data.reset_index(drop=True)
 
-train_data.head(3)
+train_data
 
 print('CONTEXT:',train_data['context'][0])
 print('QUESTION:',train_data['question'][0])
@@ -87,6 +87,8 @@ for i in range(len(train_data)):
     if len(pos) != 0 :
         first_pos_train.append(pos[0])
         last_pos_train.append(pos[-1])
+
+    # elif pos[-1] >= input_len
     else :
         first_pos_train.append(-1)
         last_pos_train.append(-1)
@@ -110,7 +112,21 @@ for i in range(len(test_data)):
 dropper = np.where(np.array(first_pos_train) == -1)[0]
 dropper
 
-train_data  = train_data.drop(dropper).reset_index(drop = True)
+dropper2 = np.where(np.array(last_pos_train) > input_len-1)[0]
+
+# dropper3 =[]
+# for i in range(len(first_pos_train)):
+#     if first_pos_train[i] > last_pos_train[i]:
+#         # print(first_pos_train[i])
+#         # print(last_pos_train[i])
+#         dropper3.append(i)
+
+
+
+# np.unique(last_pos_train)
+
+train_data  = train_data.drop(dropper)
+train_data  = train_data.drop(dropper2).reset_index(drop = True)
 train_answer_str = bolucu(train_data['answer']).splitter()
 train_question_str = bolucu(train_data['question']).splitter()
 train_context_str = bolucu(train_data['context']).splitter()
@@ -149,6 +165,12 @@ for i in range(len(test_data)):
     else :
         first_pos_test.append(-1)
         last_pos_test.append(-1)
+
+np.where(np.array(last_pos_train)> input_len)
+
+train_data =train_data.dropna().reset_index(drop=True)
+
+train_data
 
 def encoder(x,y):
     tokenizer = BertWordPieceTokenizer(vocab=vocab_file, lowercase=True)
@@ -196,6 +218,7 @@ pad_type_ids_test = padder(test_type_ids,input_len)
 pad_attention_mask_test = padder(test_attention_mask,input_len)
 pad_special_tokens_mask_test = padder(test_special_tokens_mask, input_len)
 
+callback = tf.keras.callbacks.EarlyStopping(monitor = 'loss', patience = 0)
 input_word_ids = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name='input_word_ids')
 input_mask = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name='input_mask')
 input_type_ids = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name='input_type_ids')
@@ -219,18 +242,28 @@ model.compile(optimizer=optimizer, loss=[loss, loss],
 
 dummy_y = np.ones(len(pad_type_ids_train),dtype = 'int32')
 
+train_data['first_pos'] = first_pos_train
+train_data['last_pos'] = last_pos_train
+train_data
+
 history = model.fit([
             (pad_ids_train), 
-            (pad_special_tokens_mask_train), 
+            (pad_attention_mask_train), 
             (pad_type_ids_train)
             ],
-            [
-            np.array(first_pos_train).reshape(-1,1),
-            np.array(last_pos_train).reshape(-1,1)
-            ],
-            epochs = 5,
-            batch_size = 2
+            ([
+            # dummy_y,
+            # dummy_y
+            np.array(first_pos_train),
+            np.array(last_pos_train)
+            ]),
+            epochs = 1,
+            batch_size = 8,
+            callbacks = [callback],
+
 )
+
+np.array(first_pos_train).reshape(-1,1).shape
 
 preds_start, preds_end = model.predict(
             [
