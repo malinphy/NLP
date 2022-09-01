@@ -7,6 +7,15 @@ Original file is located at
     https://colab.research.google.com/drive/10sySnP4T8Ir7dA-x9d8zUiwjH-pKQee5
 """
 
+import os 
+import json
+# from google.colab import files 
+from google.colab import drive
+drive.mount('/content/drive')
+import pandas as pd
+import numpy as np
+import re
+
 import numpy as np 
 import pandas as pd
 import os 
@@ -30,32 +39,76 @@ bert_layer = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H
 vocab_file = bert_layer.resolved_object.vocab_file.asset_path.numpy().decode("utf-8")
 tokenizer = BertWordPieceTokenizer(vocab=vocab_file, lowercase=True)
 
-from google.colab import files 
-from google.colab import drive
-drive.mount('/content/drive')
-path ='/content/drive/MyDrive/Colab Notebooks/squad/squad.csv'
-# galiba kritik sinir 451
-
-train_data = pd.read_csv(path,
-                        #  nrows = 1000
-                         )
-print(len(train_data))
-train_data = train_data.dropna().reset_index(drop=True)
-print(len(train_data))
-
 input_len = 384
 
-test_data = train_data.loc[87500:87598].reset_index()
-train_data = train_data.loc[0:20000]
+
+train_path = 'drive/MyDrive/Colab Notebooks/datasets/squad/train-v1.1.json'
+test_path = 'drive/MyDrive/Colab Notebooks/datasets/squad/dev-v1.1.json'
+
+
+class df_maker :
+    def __init__(self,json_path):
+        self.json_path = json_path
+        # self.test_path = test_path
+
+    def squad_json_to_dataframe(self, record_path=['data','paragraphs','qas','answers']):
+        """
+        input_file_path: path to the squad json file.
+        record_path: path to deepest level in json file default value is
+        ['data','paragraphs','qas','answers']
+        """
+        file = json.loads(open(self.json_path).read())
+        # parsing different level's in the json file
+        js = pd.json_normalize(file, record_path)
+        m = pd.json_normalize(file, record_path[:-1])
+        r = pd.json_normalize(file,record_path[:-2])
+        # combining it into single dataframe
+        idx = np.repeat(r['context'].values, r.qas.str.len())
+        m['context'] = idx
+        data = m[['id','question','context','answers']].set_index('id').reset_index()
+        data['c_id'] = data['context'].factorize()[0]
+        return data 
+
+    # def answer_extractor(x):
+
+train_data = df_maker(train_path).squad_json_to_dataframe()
+test_data = df_maker(test_path).squad_json_to_dataframe()
+
+class answer_extractor :
+    def __init__(self,x):
+        self.x = x
+    def answer_extractor_2(self):
+        answer_str= []
+        answer_str_pos = []
+        
+        for i in range(len(self.x)):
+        
+            var1 = self.x[i]
+            var2 = re.sub('\[{|\'}]','',str(var1))
+            var3 = var2.split(':')[-1].strip()
+            answer_str.append(re.sub('\'','',var3))
+
+            answer_str_pos.append(int(re.sub(',','',str(var1).split(' ')[1])))
+
+        return(answer_str,answer_str_pos)
+    
+train_answer_text,train_answer_pos = answer_extractor(train_data['answers']).answer_extractor_2()
+test_answer_text,test_answer_pos = answer_extractor(test_data['answers']).answer_extractor_2()
+
+train_data = train_data.drop(columns = ['id', 'c_id'])
+train_data['answers'] = train_answer_text
+train_data['starting_idx'] = train_answer_pos
+
+test_data = test_data.drop(columns = ['id', 'c_id'])
+test_data['answers'] = test_answer_text
+test_data['starting_idx'] = test_answer_pos
+
 train_data = train_data.reset_index(drop=True)
+test_data = test_data.reset_index(drop=True)
 
+class str_maker :
+# class bolucu :
 
-
-print('CONTEXT:',train_data['context'][0])
-print('QUESTION:',train_data['question'][0])
-print('ANSWER:',train_data['answer'][0])
-
-class bolucu :
   def __init__(self, data):
     self.data = data 
 
@@ -66,95 +119,53 @@ class bolucu :
 
     return bos
 
-train_answer_str = bolucu(train_data['answer']).splitter()
-train_question_str = bolucu(train_data['question']).splitter()
-train_context_str = bolucu(train_data['context']).splitter()
+train_answer_str = str_maker(train_data['answers']).splitter()
+train_question_str = str_maker(train_data['question']).splitter()
+train_context_str = str_maker(train_data['context']).splitter()
 
-test_answer_str = bolucu(test_data['answer']).splitter()
-test_question_str = bolucu(test_data['question']).splitter()
-test_context_str = bolucu(test_data['context']).splitter()
+test_answer_str = str_maker(test_data['answers']).splitter()
+test_question_str = str_maker(test_data['question']).splitter()
+test_context_str = str_maker(test_data['context']).splitter()
 
-pos = []
-first_pos_train = []
-last_pos_train = []
-for i in range(len(train_data)):
-    context_ids = tokenizer.encode(train_data['context'][i]).ids
-    answer_ids = tokenizer.encode(train_data['answer'][i]).ids[1:-1]
-    pos = (np.where(np.in1d(context_ids,answer_ids)== True)[0])
-    # print(i)
-    if len(pos) != 0 :
-        first_pos_train.append(pos[0])
+def token_positioner(x):
+    first_pos = []
+    last_pos = []
+    for i in range(len(x)):
+        context_ids = tokenizer.encode(x['context'][i]).ids
+        answer_ids = tokenizer.encode(x['answers'][i]).ids[1:-1]
+        pos = (np.where(np.in1d(context_ids,answer_ids)== True)[0])
+        # print(i)
+        if len(pos) != 0 :
+            first_pos.append(pos[0])
         # last_pos_train.append(pos[-1])
-        last_pos_train.append(pos[0]+len(answer_ids))
+            last_pos.append(pos[0]+len(answer_ids))
 
+        else :
+            first_pos.append(-1)
+            last_pos.append(-1)
+        # pos.append
 
-    else :
-        first_pos_train.append(-1)
-        last_pos_train.append(-1)
-    # pos.append
+    return first_pos, last_pos
 
-pos = []
-first_pos_test = []
-last_pos_test = []
-for i in range(len(test_data)):
-    context_ids = tokenizer.encode(test_data['context'][i]).ids
-    answer_ids = tokenizer.encode(test_data['answer'][i]).ids[1:-1]
-    pos = (np.where(np.in1d(context_ids,answer_ids)== True)[0])
-    # print(i)
-    if len(pos) != 0 :
-        first_pos_test.append(pos[0])
-        last_pos_train.append(pos[0]+len(answer_ids))
-
-    else :
-        first_pos_test.append(-1)
-        last_pos_test.append(-1)
+first_pos_train,last_pos_train = token_positioner(train_data)
+first_pos_test,last_pos_test = token_positioner(test_data)
 
 dropper = np.where(np.array(first_pos_train) == -1)[0]
 dropper2 = np.where(np.array(last_pos_train) > input_len-1)[0]
 train_data  = train_data.drop(dropper)
 train_data  = train_data.drop(dropper2).reset_index(drop = True)
 
-train_answer_str = bolucu(train_data['answer']).splitter()
-train_question_str = bolucu(train_data['question']).splitter()
-train_context_str = bolucu(train_data['context']).splitter()
+train_answer_str = str_maker(train_data['answers']).splitter()
+train_question_str = str_maker(train_data['question']).splitter()
+train_context_str = str_maker(train_data['context']).splitter()
 
-test_answer_str = bolucu(test_data['answer']).splitter()
-test_question_str = bolucu(test_data['question']).splitter()
-test_context_str = bolucu(test_data['context']).splitter()
+test_answer_str = str_maker(test_data['answers']).splitter()
+test_question_str = str_maker(test_data['question']).splitter()
+test_context_str = str_maker(test_data['context']).splitter()
 
-pos = []
-first_pos_train = []
-last_pos_train = []
-print(len(train_data))
-for i in range(len(train_data)):
-    context_ids = tokenizer.encode(train_data['context'][i]).ids
-    answer_ids = tokenizer.encode(train_data['answer'][i]).ids[1:-1]
-    pos = (np.where(np.in1d(context_ids,answer_ids)== True)[0])
-    # print(i)
-    if len(pos) != 0 :
-        first_pos_train.append(pos[0])
-        last_pos_train.append(pos[0]+len(answer_ids))
-    # else :
-    #     first_pos_train.append(-1)
-    #     last_pos_train.append(-1)
-    # pos.append
+first_pos_train,last_pos_train = token_positioner(train_data)
+first_pos_test,last_pos_test = token_positioner(test_data)
 
-pos = []
-first_pos_test = []
-last_pos_test = []
-for i in range(len(test_data)):
-    context_ids = tokenizer.encode(test_data['context'][i]).ids
-    answer_ids = tokenizer.encode(test_data['answer'][i]).ids[1:-1]
-    pos = (np.where(np.in1d(context_ids,answer_ids)== True)[0])
-    # print(i)
-    if len(pos) != 0 :
-        first_pos_test.append(pos[0])
-        last_pos_test.append(pos[0]+len(answer_ids))
-    else :
-        first_pos_test.append(-1)
-        last_pos_test.append(-1)
-
-len(first_pos_train)
 
 train_data['first_pos'] = first_pos_train
 train_data['last_pos'] = last_pos_train
@@ -163,9 +174,6 @@ train_data
 test_data['first_pos'] = first_pos_test
 test_data['last_pos'] = last_pos_test
 
-test_data
-
-tokenizer.encode('Kathmandu Metropolitan City').tokens
 
 def encoder(x,y):
     tokenizer = BertWordPieceTokenizer(vocab=vocab_file, lowercase=True)
@@ -187,6 +195,7 @@ def encoder(x,y):
         ids_len.append(len(var1.ids))
     return ids, type_ids, tokens, offsets, attention_mask, special_tokens_mask,ids_len
 
+
 train_ids, train_type_ids, train_tokens, train_offsets, train_attention_mask, train_special_tokens_mask, train_ids_len = encoder(train_context_str,train_answer_str)
 test_ids, test_type_ids, test_tokens, test_offsets, test_attention_mask, test_special_tokens_mask, test_ids_len = encoder(test_context_str,test_answer_str)
 
@@ -201,8 +210,6 @@ def padder(x,pad_len):
     )
     return padded_var
 
-
-
 pad_ids_train = padder(train_ids,input_len)
 pad_type_ids_train = padder(train_type_ids,input_len)
 pad_attention_mask_train = padder(train_attention_mask,input_len)
@@ -213,35 +220,6 @@ pad_type_ids_test = padder(test_type_ids,input_len)
 pad_attention_mask_test = padder(test_attention_mask,input_len)
 pad_special_tokens_mask_test = padder(test_special_tokens_mask, input_len)
 
-# input_word_ids = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name='input_word_ids')
-# input_mask = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name='input_mask')
-# input_type_ids = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name='input_type_ids')
-
-# bert_layer = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H-768_A-12/2", trainable=True)
-# pooled_output, sequence_output = bert_layer([input_word_ids, input_mask, input_type_ids])
-
-# start_logits = layers.Dense(1, name="start_logit", use_bias=False)(sequence_output)
-# start_logits = layers.Flatten()(start_logits)
-# start_probs = layers.Activation(keras.activations.softmax)(start_logits)
-
-# end_logits = layers.Dense(1, name = 'end_logit', use_bias = False)(sequence_output)
-# end_logits = layers.Flatten()(end_logits)
-# end_probs = layers.Activation(keras.activations.softmax)(end_logits)
-
-# model = keras.Model(inputs=[input_word_ids, input_mask, input_type_ids], outputs=[start_probs, end_probs])
-
-# loss = keras.losses.SparseCategoricalCrossentropy(from_logits=False)
-# optimizer = keras.optimizers.Adam(lr=1e-5, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
-# model.compile(optimizer=optimizer, loss=[loss, loss],
-#               metrics = ['accuracy'])
-
-p_out, seq_out = bert_layer([(pad_ids_train[0:2]), 
-            (pad_attention_mask_train[0:2]), 
-            (pad_type_ids_train[0:2])])
-
-layers.Flatten()(np.array(seq_out)[0]).shape
-
-# start_probs
 
 input_word_ids = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name='input_word_ids')
 input_mask = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name='input_mask')
@@ -250,19 +228,12 @@ input_type_ids = tf.keras.layers.Input(shape=(input_len,), dtype=tf.int32, name=
 bert_layer = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H-768_A-12/2", trainable=True)
 pooled_output, sequence_output = bert_layer([input_word_ids, input_mask, input_type_ids])
 
-# start_logits = layers.Dense(1, name="start_logit", use_bias=False)(sequence_output)
-# start_logits = layers.Flatten()(start_logits)
-# start_probs = layers.Activation(keras.activations.softmax)(start_logits)
-
 start_flatten = layers.Flatten()(sequence_output)
 start_final = layers.Dense(input_len, activation = 'softmax')(start_flatten)
 
 end_flatten = layers.Flatten()(sequence_output)
 end_final = layers.Dense(input_len, activation = 'softmax')(start_flatten)
 
-# end_logits = layers.Dense(1, name = 'end_logit', use_bias = False)(sequence_output)
-# end_logits = layers.Flatten()(end_logits)
-# end_probs = layers.Activation(keras.activations.softmax)(end_logits)
 
 model = keras.Model(inputs=[input_word_ids, input_mask, input_type_ids], outputs=[start_final, end_final])
 
@@ -271,39 +242,37 @@ optimizer = keras.optimizers.Adam(lr=1e-5, beta_1=0.9, beta_2=0.98, epsilon=1e-9
 model.compile(optimizer=optimizer, loss=[loss, loss],
               metrics = ['accuracy'])
 
-test_data.head(13)
+
 
 history = model.fit([
-            (pad_ids_train), 
-            (pad_attention_mask_train), 
-            (pad_type_ids_train)
+            (pad_ids_train[0:30000]), 
+            (pad_attention_mask_train[0:30000]), 
+            (pad_type_ids_train[0:30000])
             ],
             ([
             # dummy_y,
             # dummy_y
-            np.array(first_pos_train),
-            np.array(last_pos_train)
+            np.array(first_pos_train[0:30000]),
+            np.array(last_pos_train[0:30000])
             ]),
             epochs = 1,
             batch_size = 8,
-            # callbacks = [callback],
+            )
 
-)
+
 
 preds_start, preds_end = model.predict(
             [
-            (pad_ids_test[0:12]), 
-            (pad_attention_mask_test[0:12]), 
-            (pad_type_ids_test[0:12])
+            (pad_ids_test[0:20]), 
+            (pad_attention_mask_test[0:20]), 
+            (pad_type_ids_test[0:20])
             ])
 
-num = 11
+
+num = 19
 
 tokenizer.encode(test_data['context'][num]).tokens[np.argmax(preds_start[num]):np.argmax(preds_end[num])]
 
-sayi = 2
-print(np.argmax(preds_end[sayi]))
-print(first_pos_test[sayi])
 
-# print(last_pos_test[sayi])
+
 
