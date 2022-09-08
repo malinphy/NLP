@@ -7,9 +7,9 @@ import tensorflow_hub as hub
 import tensorflow_text as text 
 
 def ner_model(num_tags):
-    encoder_url = 'https://tfhub.dev/tensorflow/bert_en_cased_preprocess/3'
-    # bert_url = "https://tfhub.dev/tensorflow/bert_en_cased_L-12_H-768_A-12/4"
-    bert_url = 'https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-2_H-128_A-2/2'
+    encoder_url = "https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3"
+    bert_url = "https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-6_H-128_A-2/2"
+#     bert_url = "https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-6_H-128_A-2/2"
 
 
     preprocessor = hub.KerasLayer(encoder_url)
@@ -18,6 +18,6 @@ def ner_model(num_tags):
     encoder_inputs = preprocessor(text_input)
     outputs = encoder(encoder_inputs)
     sequence_output = outputs["sequence_output"]
-    sequence_output = Dropout(0.5)(sequence_output)
-    final_layer = Dense(num_tags+1, activation = 'softmax')(sequence_output)
+    sequence_output = Dropout(0.3)(sequence_output)
+    final_layer = Dense(num_tags, activation = 'softmax')(sequence_output)
     return Model(inputs = text_input, outputs = final_layer)
