@@ -26,10 +26,7 @@ class df_maker :
         data['c_id'] = data['context'].factorize()[0]
         return data 
 
-    # def answer_extractor(x):
 
-#train_data = df_maker(train_path).squad_json_to_dataframe()
-#test_data = df_maker(test_path).squad_json_to_dataframe()
 
 
 class answer_extractor :
