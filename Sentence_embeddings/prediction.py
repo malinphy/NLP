@@ -32,5 +32,5 @@ def prediction(premise,hypothesis):
 
     return str(LE.inverse_transform(tf.math.top_k(use_model.predict([new_df['p'], new_df['h']]))[1]))
 
-prediction(p1,h1)
+print(prediction(p1,h1))
 
