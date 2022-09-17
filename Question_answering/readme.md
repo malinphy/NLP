@@ -7,7 +7,6 @@ QUESTION: Which NFL team represented the AFC at Super Bowl 50?
 ANSWER:Denver Broncos  
 PREDICTED ANSWER: denver broncos
 
-
 QUESTION : What day was the game played on?
 ANSWER : February 7, 2016
 PREDICTED ANSWER: february 7 , 2016
