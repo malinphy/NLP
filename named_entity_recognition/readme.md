@@ -1,5 +1,5 @@
 REQUIREMENTS
-===============
+---------------
 ```
 python version: 3.7.14
 numpy version: 1.21.6
@@ -14,7 +14,7 @@ sklearn version: 1.0.2
 seaborn version: 0.11.2
 ```
 EVALUATION
-===============
+---------------
 ###### Classification Report
 ```
 F1 score: 0.917871611886156
@@ -41,7 +41,7 @@ weighted avg       0.91      0.92      0.91     58993
 ![image](https://user-images.githubusercontent.com/55249305/191540581-88ddb58d-bfd2-4b57-bb69-aa91c3fcc476.png)
 
 Example
-===============
+---------------
 ```
 test_sentence : ['CRICKET - LEICESTERSHIRE TAKE OVER AT TOP AFTER INNINGS VICTORY .']
 test_tags : O O B-ORG O O O O O O O O
