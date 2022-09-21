@@ -1,4 +1,18 @@
-
+REQUIREMENTS
+===============
+```
+python version: 3.7.14
+numpy version: 1.21.6
+pandas version: 1.3.5
+regex version: 2.2.1
+tensorflow version: 2.10.0
+keras version: 2.10.0
+tf_hub version: 0.12.0
+tf_text version: 2.10.0
+tokenizers version: 0.13.0
+sklearn version: 1.0.2
+seaborn version: 0.11.2
+```
 EVALUATION
 ===============
 ###### Classification Report
